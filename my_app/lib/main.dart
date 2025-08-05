@@ -40,14 +40,23 @@ class _UrlListPageState extends State<UrlListPage> {
   }
 
   Future<void> loadUrls() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString('saved_urls');
-    if (data != null) {
+  final prefs = await SharedPreferences.getInstance();
+  final data = prefs.getString('saved_urls');
+  if (data != null) {
+    final decodedList = jsonDecode(data);
+    if (decodedList is List) {
       setState(() {
-        savedUrls = List<Map<String, String>>.from(jsonDecode(data));
-      });
+        savedUrls = decodedList.map<Map<String, String>>((e) {
+          return {
+            'name': e['name'].toString(),
+              'url': e['url'].toString(),
+            };
+          }).toList();
+        });
+      }
     }
   }
+
 
   Future<void> saveUrl(String name, String url) async {
     final prefs = await SharedPreferences.getInstance();
@@ -205,21 +214,56 @@ class _UrlListPageState extends State<UrlListPage> {
   }
 }
 
-class WebViewPage extends StatelessWidget {
+class WebViewPage extends StatefulWidget {
   final String url;
   final String title;
 
   const WebViewPage({super.key, required this.url, required this.title});
 
   @override
-  Widget build(BuildContext context) {
+  State<WebViewPage> createState() => _WebViewPageState();
+}
+
+class _WebViewPageState extends State<WebViewPage> {
+  late InAppWebViewController webViewController;
+
+  @override
+  void initState() {
+    super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: InAppWebView(
-          initialUrlRequest: URLRequest(url: WebUri(url)),
+          initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+          initialSettings: InAppWebViewSettings(
+            javaScriptEnabled: true,
+            supportZoom: true,
+            javaScriptCanOpenWindowsAutomatically: true,
+            useOnDownloadStart: true,
+            useShouldOverrideUrlLoading: true,
+            mediaPlaybackRequiresUserGesture: false,
+          ),
+          onWebViewCreated: (controller) {
+            webViewController = controller;
+          },
+          onCreateWindow: (controller, createWindowRequest) async {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => WebViewPage(
+                  url: createWindowRequest.request.url.toString(),
+                  title: widget.title,
+                ),
+              ),
+            );
+            return true;
+          },
         ),
       ),
     );
   }
-}
+} 
