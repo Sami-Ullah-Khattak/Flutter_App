@@ -226,6 +226,7 @@ class WebViewPage extends StatefulWidget {
 
 class _WebViewPageState extends State<WebViewPage> {
   late InAppWebViewController webViewController;
+  
 
   @override
   void initState() {
@@ -243,6 +244,7 @@ class _WebViewPageState extends State<WebViewPage> {
             javaScriptEnabled: true,
             supportZoom: true,
             javaScriptCanOpenWindowsAutomatically: true,
+            supportMultipleWindows: true,
             useOnDownloadStart: true,
             useShouldOverrideUrlLoading: true,
             mediaPlaybackRequiresUserGesture: false,
