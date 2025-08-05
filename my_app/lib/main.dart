@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -9,6 +10,7 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -34,6 +36,7 @@ class _UrlListPageState extends State<UrlListPage> {
   void initState() {
     super.initState();
     loadUrls();
+    openLastOpened();
   }
 
   Future<void> loadUrls() async {
@@ -49,6 +52,13 @@ class _UrlListPageState extends State<UrlListPage> {
   Future<void> saveUrl(String name, String url) async {
     final prefs = await SharedPreferences.getInstance();
     savedUrls.add({'name': name, 'url': url});
+    await prefs.setString('saved_urls', jsonEncode(savedUrls));
+    setState(() {});
+  }
+
+  Future<void> deleteUrl(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    savedUrls.removeAt(index);
     await prefs.setString('saved_urls', jsonEncode(savedUrls));
     setState(() {});
   }
@@ -93,7 +103,10 @@ class _UrlListPageState extends State<UrlListPage> {
     );
   }
 
-  void openWebView(String name, String url) {
+  Future<void> openWebView(String name, String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_opened', jsonEncode({'name': name, 'url': url}));
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -102,10 +115,71 @@ class _UrlListPageState extends State<UrlListPage> {
     );
   }
 
+  Future<void> openLastOpened() async {
+    final prefs = await SharedPreferences.getInstance();
+    final last = prefs.getString('last_opened');
+    if (last != null) {
+      final data = jsonDecode(last);
+      openWebView(data['name'], data['url']);
+    }
+  }
+
+  void exportUrls() async {
+    final exportData = jsonEncode(savedUrls);
+    await Clipboard.setData(ClipboardData(text: exportData));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Exported to clipboard")),
+    );
+  }
+
+  void importUrls() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Import URLs"),
+        content: TextField(
+          controller: controller,
+          maxLines: 10,
+          decoration: const InputDecoration(hintText: "Paste exported JSON here"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              try {
+                final imported = jsonDecode(controller.text);
+                if (imported is List) {
+                  savedUrls = List<Map<String, String>>.from(imported);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('saved_urls', jsonEncode(savedUrls));
+                  setState(() {});
+                  Navigator.pop(context);
+                }
+              } catch (e) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Invalid JSON")),
+                );
+              }
+            },
+            child: const Text("Import"),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Saved URLs')),
+      appBar: AppBar(
+        title: const Text('My Saved URLs'),
+        actions: [
+          IconButton(onPressed: exportUrls, icon: const Icon(Icons.upload)),
+          IconButton(onPressed: importUrls, icon: const Icon(Icons.download)),
+        ],
+      ),
       body: savedUrls.isEmpty
           ? const Center(child: Text("No URLs saved. Click + to add one."))
           : ListView.builder(
@@ -115,6 +189,10 @@ class _UrlListPageState extends State<UrlListPage> {
                 return ListTile(
                   title: Text(item['name'] ?? 'Untitled'),
                   subtitle: Text(item['url'] ?? ''),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => deleteUrl(index),
+                  ),
                   onTap: () => openWebView(item['name']!, item['url']!),
                 );
               },
@@ -135,10 +213,12 @@ class WebViewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: InAppWebView(
-        initialUrlRequest: URLRequest(url: WebUri(url)),
+      body: SafeArea(
+        child: InAppWebView(
+          initialUrlRequest: URLRequest(url: WebUri(url)),
+        ),
       ),
     );
   }
