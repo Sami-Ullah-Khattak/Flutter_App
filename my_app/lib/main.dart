@@ -40,15 +40,15 @@ class _UrlListPageState extends State<UrlListPage> {
   }
 
   Future<void> loadUrls() async {
-  final prefs = await SharedPreferences.getInstance();
-  final data = prefs.getString('saved_urls');
-  if (data != null) {
-    final decodedList = jsonDecode(data);
-    if (decodedList is List) {
-      setState(() {
-        savedUrls = decodedList.map<Map<String, String>>((e) {
-          return {
-            'name': e['name'].toString(),
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('saved_urls');
+    if (data != null) {
+      final decodedList = jsonDecode(data);
+      if (decodedList is List) {
+        setState(() {
+          savedUrls = decodedList.map<Map<String, String>>((e) {
+            return {
+              'name': e['name'].toString(),
               'url': e['url'].toString(),
             };
           }).toList();
@@ -56,7 +56,6 @@ class _UrlListPageState extends State<UrlListPage> {
       }
     }
   }
-
 
   Future<void> saveUrl(String name, String url) async {
     final prefs = await SharedPreferences.getInstance();
@@ -226,7 +225,6 @@ class WebViewPage extends StatefulWidget {
 
 class _WebViewPageState extends State<WebViewPage> {
   late InAppWebViewController webViewController;
-  
 
   @override
   void initState() {
@@ -257,15 +255,18 @@ class _WebViewPageState extends State<WebViewPage> {
               context,
               MaterialPageRoute(
                 builder: (context) => WebViewPage(
-                  url: createWindowRequest.request.url.toString(),
+                  url: createWindowRequest.request.url?.toString() ?? widget.url,
                   title: widget.title,
                 ),
               ),
             );
             return true;
           },
+          shouldOverrideUrlLoading: (controller, action) async {
+            return NavigationActionPolicy.ALLOW;
+          },
         ),
       ),
     );
   }
-} 
+}
